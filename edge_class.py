@@ -11,6 +11,7 @@ class Edge:
         self.length = dist(node_a.coords, node_b.coords)
     
     def draw_edge(self):
+        print("here", self, self.pheromone)
         if self.is_best:
             pygame.draw.aaline(self.screen, (42, 232, 64), self.node_a.coords, self.node_b.coords)
         else:

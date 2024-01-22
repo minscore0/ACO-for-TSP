@@ -15,19 +15,52 @@ font = pygame.font.Font("freesansbold.ttf", 15)
 
 # global constants
 alpha = 1 #(0.2-1)
-global GREEN, BLUE, WHITE, BLACK, NUMBER_OF_ANTS
+global GREEN, BLUE, WHITE, BLACK, NUMBER_OF_ANTS, MAX_PHEROMONE, MIN_PHEROMONE, EVAPORATION_RATE, NUM_INTERATIONS
 NUMBER_OF_ANTS = 20
 GREEN = (42, 232, 64)
 BLUE = (48, 171, 255)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
+MAX_PHEROMONE = 1
+MIN_PHEROMONE = 0.01
+EVAPORATION_RATE = 0.35
+NUM_ITERATIONS = 10
 
 
 def run_ACO(screen, nodes, node_names, name_rects, edges, find_edge): # runs the ACO algorithm
-    paths = list()
-    for ant in range(NUMBER_OF_ANTS):
-        paths.append(create_path(screen, nodes, find_edge))
-    walk_ants(nodes, node_names, name_rects, edges, paths)
+    for i in range(NUM_ITERATIONS):
+        paths = list()
+        for ant in range(NUMBER_OF_ANTS):
+            paths.append(create_path(screen, nodes, find_edge))
+        walk_ants(nodes, node_names, name_rects, edges, paths)
+        local_pheromone_update(find_edge, paths)
+        global_pheromone_update(edges)
+        update_display(nodes, node_names, name_rects, edges)
+
+
+def route_cost(find_edge, route): # returns the total cost of a route and the edges that make up the route
+    edges = list()
+    cost = 0
+    for i in range(len(route)-1):
+        edges.append(find_edge[route[i].number][route[i+1].number])
+    for edge in edges:
+        cost += edge.length
+    
+    return cost, edges
+
+
+def local_pheromone_update(find_edge, paths): # updates pheromone paths
+    for route in paths:
+        cost, route_edges = route_cost(find_edge, route)
+        for edge in route_edges:
+            print("added", min(MAX_PHEROMONE, edge.pheromone + (50/cost)))
+            edge.pheromone = min(MAX_PHEROMONE, edge.pheromone + (50/cost))
+            print(edge, edge.pheromone)
+
+
+def global_pheromone_update(edges): # evaporates pheromone from all paths
+    for edge in edges:
+        edge.pheromone = max(MIN_PHEROMONE, edge.pheromone * (1-EVAPORATION_RATE))
 
 
 def create_path(screen, nodes, find_edge) -> list: # creates a route through the graph
@@ -62,7 +95,7 @@ def walk_ants(nodes, node_names, name_rects, edges, paths: set): # shows the ant
         return (A[0] + t/100*v_len*u_v[0], A[1] + t/100*v_len*u_v[1])
 
     for step in steps:
-        for t in range(0, 100, 4):
+        for t in range(0, 100, 5):
             ant_positions = set()
             for ant in step:
                 A, B = ant[0].coords, ant[1].coords
@@ -70,21 +103,20 @@ def walk_ants(nodes, node_names, name_rects, edges, paths: set): # shows the ant
             update_display(nodes, node_names, name_rects, edges, ant_positions)
 
 
-def add_node(screen, nodes, node_names, name_rects, edges, find_edge) -> tuple[list, list, list, list, list, list]: # adds a node to the graph
+def add_node(screen, nodes, node_names, name_rects, edges, find_edge) -> tuple[list, list, list, list, set, list]: # adds a node to the graph
     nodes.append(Node(screen, len(nodes), pygame.mouse.get_pos()))
+    added_node = nodes[-1]
     node_names.append(font.render(str(len(nodes)-1), True, WHITE))
     name_rects.append(node_names[-1].get_rect())
     name_rects[-1].center = (nodes[-1].coords[0], nodes[-1].coords[1]+22)
-    find_edge.append(list())
+    find_edge.append([])
 
-    for node in nodes:
-        find_edge[-1].append(Edge(screen, nodes[-1], node))
-        edges.append(find_edge[-1][-1])
-    for node in nodes[:-1]:
-        find_edge[int(node.number)].append(Edge(screen, node, nodes[-1]))
-        edges.append(find_edge[int(node.number)][-1])
-    
-    return nodes, node_names, name_rects, edges, find_edge
+    for i in range(len(find_edge)-1):
+        find_edge[i].append(Edge(screen, nodes[i], added_node))
+        find_edge[added_node.number].append(find_edge[i][added_node.number])
+    find_edge[-1].append(Edge(screen, added_node, added_node))
+
+    return nodes, node_names, name_rects, {x for xs in find_edge for x in xs}, find_edge
 
 
 def update_display(nodes=list(), node_names=list(), name_rects=list(), edges=list(), ant_positions=set()): # updates the pygame display
@@ -138,6 +170,8 @@ while running:
                 started = True
                 print("started")
                 run_ACO(screen, nodes, node_names, name_rects, edges, find_edge) 
+                started = False
+                nodes, node_names, name_rects, edges, find_edge = list(), list(), list(), list(), list()
 
             elif event.key == pygame.K_t: # for testing
                 print("test started")
