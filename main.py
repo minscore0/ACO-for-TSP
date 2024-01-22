@@ -16,11 +16,11 @@ font = pygame.font.Font("freesansbold.ttf", 15)
 # global constants
 alpha = 1 #(0.2-1)
 global GREEN, BLUE, WHITE, BLACK, NUMBER_OF_ANTS, MAX_PHEROMONE, MIN_PHEROMONE, EVAPORATION_RATE, NUM_INTERATIONS
-NUMBER_OF_ANTS = 20
 GREEN = (42, 232, 64)
 BLUE = (48, 171, 255)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
+NUMBER_OF_ANTS = 50
 MAX_PHEROMONE = 1
 MIN_PHEROMONE = 0.01
 EVAPORATION_RATE = 0.35
@@ -53,8 +53,8 @@ def local_pheromone_update(find_edge, paths): # updates pheromone paths
     for route in paths:
         cost, route_edges = route_cost(find_edge, route)
         for edge in route_edges:
-            print("added", min(MAX_PHEROMONE, edge.pheromone + (50/cost)))
-            edge.pheromone = min(MAX_PHEROMONE, edge.pheromone + (50/cost))
+            print("added", min(MAX_PHEROMONE, edge.pheromone + (100/cost)))
+            edge.pheromone = min(MAX_PHEROMONE, edge.pheromone + (100/cost))
             print(edge, edge.pheromone)
 
 
