@@ -11,6 +11,7 @@ class Node:
         self.is_best = is_best
 
     def draw_node(self):
+        self.pheromone = 1
         pygame.gfxdraw.filled_circle(self.screen, self.coords[0], self.coords[1], self.radius, self.color)
         pygame.gfxdraw.aacircle(self.screen, self.coords[0], self.coords[1], self.radius, self.color)
 

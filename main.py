@@ -11,29 +11,58 @@ pygame.display.set_caption("And Colony Optimization for TSP")
 clock = pygame.time.Clock()
 global screen
 screen = pygame.display.set_mode((1560, 900))
-font = pygame.font.Font("freesansbold.ttf", 15)
+font1 = pygame.font.Font("freesansbold.ttf", 15)
+font2 = pygame.font.Font("freesansbold.ttf", 30)
 
-# global constants
-alpha = 1 #(0.2-1)
-global GREEN, BLUE, WHITE, BLACK, NUMBER_OF_ANTS, MAX_PHEROMONE, MIN_PHEROMONE, EVAPORATION_RATE, NUM_INTERATIONS
+# colors
+global GREEN, BLUE, WHITE, ITERATION_NUM
 GREEN = (42, 232, 64)
 BLUE = (48, 171, 255)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
+ITERATION_NUM = None
+
+# global constants
+global NUMBER_OF_ANTS, MAX_PHEROMONE, MIN_PHEROMONE, EVAPORATION_RATE, NUM_INTERATIONS, START_ELITIST_ROUND, START_MIN_MAX_ROUND, ANT_SPEED, ALPHA, BETA
 NUMBER_OF_ANTS = 50
 MAX_PHEROMONE = 1
 MIN_PHEROMONE = 0.01
-EVAPORATION_RATE = 0.35
-NUM_ITERATIONS = 10
+EVAPORATION_RATE = 0.3
+NUM_ITERATIONS = 100
+START_ELITIST_ROUND = 40
+START_MIN_MAX_ROUND = 70
+ANT_SPEED = 5
+ALPHA = 1
+BETA = 3
 
 
 def run_ACO(screen, nodes, node_names, name_rects, edges, find_edge): # runs the ACO algorithm
+    global_best = (float("inf"), [])
     for i in range(NUM_ITERATIONS):
+        global ITERATION_NUM
+        ITERATION_NUM = i+1
         paths = list()
+        best = set()
         for ant in range(NUMBER_OF_ANTS):
             paths.append(create_path(screen, nodes, find_edge))
+        length_path = sorted([(route_cost(find_edge, path)) for path in paths], key=lambda a: a[0])
+        for edge in length_path[0][1]:
+            edge.is_best = True
+            best.add(edge)
+        for x in length_path[1:]:
+            for edge in x[1]:
+                if edge in best:
+                    continue
+                edge.is_best = False
+
         walk_ants(nodes, node_names, name_rects, edges, paths)
-        local_pheromone_update(find_edge, paths)
+        if i < START_ELITIST_ROUND:
+            stage = 1
+        elif i < START_MIN_MAX_ROUND:
+            stage = 2
+        else:
+            stage = 3
+        global_best = local_pheromone_update(find_edge, paths, stage, global_best)
         global_pheromone_update(edges)
         update_display(nodes, node_names, name_rects, edges)
 
@@ -43,20 +72,38 @@ def route_cost(find_edge, route): # returns the total cost of a route and the ed
     cost = 0
     for i in range(len(route)-1):
         edges.append(find_edge[route[i].number][route[i+1].number])
+    edges.append(find_edge[route[-1].number][route[0].number])
     for edge in edges:
         cost += edge.length
     
     return cost, edges
 
 
-def local_pheromone_update(find_edge, paths): # updates pheromone paths
+def local_pheromone_update(find_edge, paths, stage, global_best): # updates pheromone paths
+    cost_edges = list()
     for route in paths:
+        cost_edges.append(route_cost(find_edge, route))
         cost, route_edges = route_cost(find_edge, route)
-        for edge in route_edges:
-            print("added", min(MAX_PHEROMONE, edge.pheromone + (100/cost)))
-            edge.pheromone = min(MAX_PHEROMONE, edge.pheromone + (100/cost))
-            print(edge, edge.pheromone)
+    cost_edges.sort(key = lambda x: x[0])
 
+    if cost_edges[0][0] < global_best[0]:
+        global_best = (cost_edges[0][0], cost_edges[0][1])
+    if stage == 1:
+        for edge in cost_edges[0][1]:
+            edge.pheromone = min(MAX_PHEROMONE, edge.pheromone + (90/cost))
+        for path in cost_edges[1:]:
+            for edge in path[1]:
+                edge.pheromone = min(MAX_PHEROMONE, edge.pheromone + (70/cost))
+    elif stage == 2:
+        for edge in cost_edges[0][1]:
+            edge.pheromone = min(MAX_PHEROMONE, edge.pheromone + (150/cost))
+        for path in cost_edges[1:]:
+            edge.pheromone = min(MAX_PHEROMONE, edge.pheromone + (70/cost))
+    elif stage == 3:
+        for edge in global_best[1]:
+            edge.pheromone = min(MAX_PHEROMONE, edge.pheromone + (170))
+
+    return global_best
 
 def global_pheromone_update(edges): # evaporates pheromone from all paths
     for edge in edges:
@@ -69,8 +116,8 @@ def create_path(screen, nodes, find_edge) -> list: # creates a route through the
         node_probabilities = list()
         for node in ant.unvisited_nodes:
             edge = find_edge[ant.current_node.number][node.number]
-            node_probabilities.append(((edge.pheromone*(1/edge.length))
-                                       /sum([find_edge[ant.current_node.number][node.number].pheromone*(1/find_edge[ant.current_node.number][node.number].length) for node in ant.unvisited_nodes]), node))
+            node_probabilities.append((((edge.pheromone**ALPHA)*(1/edge.length)**BETA)
+                                       /sum([find_edge[ant.current_node.number][node.number].pheromone**ALPHA*((1/find_edge[ant.current_node.number][node.number].length)**BETA) for node in ant.unvisited_nodes]), node))
         
         node_roulette = [(sum([x[0] for x in node_probabilities[:i+1]]), node_probabilities[i][1]) for i in range(len(node_probabilities))]
         pick = random.random()
@@ -95,18 +142,19 @@ def walk_ants(nodes, node_names, name_rects, edges, paths: set): # shows the ant
         return (A[0] + t/100*v_len*u_v[0], A[1] + t/100*v_len*u_v[1])
 
     for step in steps:
-        for t in range(0, 100, 5):
+        for t in range(0, 100, ANT_SPEED):
             ant_positions = set()
             for ant in step:
                 A, B = ant[0].coords, ant[1].coords
                 ant_positions.add(l(t, A, B))
             update_display(nodes, node_names, name_rects, edges, ant_positions)
+        return
 
 
 def add_node(screen, nodes, node_names, name_rects, edges, find_edge) -> tuple[list, list, list, list, set, list]: # adds a node to the graph
     nodes.append(Node(screen, len(nodes), pygame.mouse.get_pos()))
     added_node = nodes[-1]
-    node_names.append(font.render(str(len(nodes)-1), True, WHITE))
+    node_names.append(font1.render(str(len(nodes)-1), True, WHITE))
     name_rects.append(node_names[-1].get_rect())
     name_rects[-1].center = (nodes[-1].coords[0], nodes[-1].coords[1]+22)
     find_edge.append([])
@@ -121,8 +169,15 @@ def add_node(screen, nodes, node_names, name_rects, edges, find_edge) -> tuple[l
 
 def update_display(nodes=list(), node_names=list(), name_rects=list(), edges=list(), ant_positions=set()): # updates the pygame display
     screen.fill(BLACK)
+    best = set()
     for edge in edges:
-        edge.draw_edge()
+        if edge.is_best:
+            best.add(edge)
+        else:
+            edge.draw_edge(EVAPORATION_RATE)
+    for edge in best:
+        edge.draw_edge(EVAPORATION_RATE)
+        edge.draw_edge(EVAPORATION_RATE)
     for i, node in enumerate(nodes):
         node.draw_node()
         screen.blit(node_names[i], name_rects[i])
@@ -130,6 +185,12 @@ def update_display(nodes=list(), node_names=list(), name_rects=list(), edges=lis
     for ant in ant_positions:
         pygame.gfxdraw.aacircle(screen, round(ant[0]), round(ant[1]), 3, (212, 70, 59))
         pygame.gfxdraw.filled_circle(screen, round(ant[0]), round(ant[1]), 3, (212, 70, 59))
+
+    if ITERATION_NUM is not None:
+        iter_text = font2.render("Round " + str(ITERATION_NUM), True, WHITE)
+        iter_rect = iter_text.get_rect()
+        iter_rect.center = (130, 70)
+        screen.blit(iter_text, iter_rect)
     
     pygame.display.flip()
 
@@ -166,12 +227,11 @@ while running:
                 update_display()
                 started = False
             
-            elif (event.key == pygame.K_KP_ENTER or event.key == pygame.K_s) and not started: # start simulation
+            elif (event.key == pygame.K_RETURN or event.key == pygame.K_s) and not started: # start simulation
                 started = True
                 print("started")
                 run_ACO(screen, nodes, node_names, name_rects, edges, find_edge) 
                 started = False
-                nodes, node_names, name_rects, edges, find_edge = list(), list(), list(), list(), list()
 
             elif event.key == pygame.K_t: # for testing
                 print("test started")
