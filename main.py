@@ -28,9 +28,9 @@ NUMBER_OF_ANTS = 50
 MAX_PHEROMONE = 1
 MIN_PHEROMONE = 0.01
 EVAPORATION_RATE = 0.3
-NUM_ITERATIONS = 100
-START_ELITIST_ROUND = 40
-START_MIN_MAX_ROUND = 70
+NUM_ITERATIONS = 80
+START_ELITIST_ROUND = 30
+START_MIN_MAX_ROUND = 60
 ANT_SPEED = 5
 ALPHA = 1
 BETA = 3
@@ -39,6 +39,7 @@ BETA = 3
 def run_ACO(screen, nodes, node_names, name_rects, edges, find_edge): # runs the ACO algorithm
     global_best = (float("inf"), [])
     for i in range(NUM_ITERATIONS):
+        clock.tick(80)
         global ITERATION_NUM
         ITERATION_NUM = i+1
         paths = list()
@@ -104,6 +105,7 @@ def local_pheromone_update(find_edge, paths, stage, global_best): # updates pher
             edge.pheromone = min(MAX_PHEROMONE, edge.pheromone + (170))
 
     return global_best
+
 
 def global_pheromone_update(edges): # evaporates pheromone from all paths
     for edge in edges:
