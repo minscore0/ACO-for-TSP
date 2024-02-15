@@ -39,7 +39,7 @@ BETA = 3
 def run_ACO(screen, nodes, node_names, name_rects, edges, find_edge): # runs the ACO algorithm
     global_best = (float("inf"), [])
     for i in range(NUM_ITERATIONS):
-        clock.tick(80)
+        clock.tick(80) #added
         global ITERATION_NUM
         ITERATION_NUM = i+1
         paths = list()
